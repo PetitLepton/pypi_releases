@@ -1,39 +1,27 @@
 import json
 import requests
-from bs4 import BeautifulSoup
 
 
 def get_latest_release(package):
     """Get the latest release version and date of a package
-    on Pypi. by scraping the pypi.org/project/{package}/#history.
+    on Pypi by using the PyPi API. The version date corresponds
+    to the latest upload.
 
     Args:
         package (str): name of the pacckage
     Returns:
         dict(version=(str), verion_date=str())"""
 
-    url = f"https://pypi.org/project/{package}/#history"
+    url = f"https://pypi.org/pypi/{package}/json"
     response = requests.get(url=url)
-    soup = BeautifulSoup(response.text, "html.parser")
-    versions = [
-        p.text.replace("\n", "").replace(" ", "")
-        for p in soup.find_all("p", {"class": "release__version"})
-    ]
-    versions_dates = [
-        list(p.children)[0]["datetime"]
-        for p in soup.find_all("p", {"class": "release__version-date"})
-    ]
-
-    releases = list()
-    for (version, version_date) in zip(versions, versions_dates):
-        releases.append(dict(version=version, version_date=version_date))
-
-    sorted_releases = list(
-        sorted(releases, key=lambda d: d["version_date"], reverse=True)
-    )
-
-    if sorted_releases:
-        latest_release = sorted_releases[0]
+    if response.ok:
+        content = response.json()
+        version = content.get("info").get("version")
+        releases = content.get("releases")
+        version_date = max(
+            (list(upload["upload_time"] for upload in releases[version]))
+        )
+        latest_release = dict(version=version, version_date=version_date)
     else:
         latest_release = None
     return latest_release
@@ -41,7 +29,6 @@ def get_latest_release(package):
 
 def store_latest_releases(packages):
     """"""
-
     latest_releases_file_name = "latest_releases.json"
 
     try:
