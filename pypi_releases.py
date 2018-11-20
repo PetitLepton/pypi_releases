@@ -1,4 +1,3 @@
-import json
 import requests
 import yaml
 
@@ -14,15 +13,15 @@ def packages_from_conda_env_file(conda_file_name):
     packages = list()
     for p in dependencies:
         if type(p) == str:
-            packages.append(p.split("=")[0])
+            name = p.split("=")[0]
+            version = p.split("=")[-1]
+            if name != "python":
+                packages.append((name, version))
         if type(p) == dict:
             pip_dependencies = p["pip"]
-            packages += [p.split("=")[0] for p in pip_dependencies]
+            packages += [(p.split("=")[0], p.split("=")[-1]) for p in pip_dependencies]
 
-    if "python" in packages:
-        packages.remove("python")
-
-    return packages
+    return dict(packages)
 
 
 def get_latest_release(package):
@@ -35,7 +34,7 @@ def get_latest_release(package):
     Returns:
         dict(version=(str), verion_date=str())"""
 
-    url = f"https://pypi.org/pypi/{package}/json"
+    url = "https://pypi.org/pypi/{0}/json".format(package)
     response = requests.get(url=url)
 
     if response.ok:
@@ -51,31 +50,15 @@ def get_latest_release(package):
     return latest_release
 
 
-def store_latest_releases(packages):
+def get_updates(packages):
     """"""
-    latest_releases_file_name = "latest_releases.json"
-
-    try:
-        with open(latest_releases_file_name, "r") as latest_releases_file:
-            pypi_releases = json.load(latest_releases_file)
-    except FileNotFoundError:
-        pypi_releases = dict()
-
-    new_releases = list()
-    for package in packages:
+    updates = list()
+    for package in packages.keys():
+        version = packages[package]
         release = get_latest_release(package=package)
         if release:
-            if package in pypi_releases.keys():
-                current_version_date = pypi_releases[package].get("version_date")
-                latest_version_date = release.get("version_date")
-                if current_version_date < latest_version_date:
-                    pypi_releases[package] = release
-                    new_releases.append((package, release["version"]))
-            else:
-                pypi_releases[package] = release
-                new_releases.append((package, release["version"]))
+            release_version = release["version"]
+            if version != release_version:
+                updates.append((package, version, release_version))
 
-    with open(latest_releases_file_name, "w") as latest_releases_file:
-        json.dump(pypi_releases, latest_releases_file, indent=2)
-
-    return new_releases
+    return updates
