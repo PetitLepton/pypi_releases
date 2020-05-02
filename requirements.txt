@@ -1,2 +1,4 @@
+requests
+pyyaml
 flake8
 pytest
